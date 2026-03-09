@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>🌸 Arreglos Florales AR</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Josefin+Sans:wght@200;300&display=swap" rel="stylesheet">
+
+  <!-- A-Frame & AR.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Josefin Sans', sans-serif;
+      background: #0a0a0a;
+      color: #f5ede8;
+      overflow: hidden;
+    }
+
+    /* ── Splash Screen ── */
+    #splash {
+      position: fixed; inset: 0; z-index: 9999;
+      background: linear-gradient(160deg, #1a0a10 0%, #0d0d0d 50%, #0a1a12 100%);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 0;
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    #splash.hidden {
+      opacity: 0; pointer-events: none; transform: scale(1.05);
+    }
+
+    .splash-deco {
+      font-size: 3.5rem;
+      animation: float 3s ease-in-out infinite;
+      margin-bottom: 1.2rem;
+      filter: drop-shadow(0 0 18px rgba(255,180,150,0.4));
+    }
+
+    .splash-brand {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2rem, 8vw, 3.2rem);
+      font-weight: 300;
+      letter-spacing: 0.12em;
+      color: #f5ede8;
+      text-align: center;
+      line-height: 1.2;
+    }
+    .splash-brand span {
+      color: #e8a89c;
+      font-style: italic;
+    }
+
+    .splash-sub {
+      font-size: 0.7rem;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: #9e8a7a;
+      margin-top: 0.6rem;
+      text-align: center;
+    }
+
+    .divider {
+      width: 60px; height: 1px;
+      background: linear-gradient(90deg, transparent, #e8a89c, transparent);
+      margin: 2rem auto;
+    }
+
+    .splash-instructions {
+      max-width: 280px;
+      text-align: center;
+      line-height: 1.8;
+    }
+
+    .step {
+      display: flex; align-items: flex-start; gap: 1rem;
+      margin-bottom: 1.2rem;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards;
+    }
+    .step:nth-child(1) { animation-delay: 0.3s; }
+    .step:nth-child(2) { animation-delay: 0.5s; }
+    .step:nth-child(3) { animation-delay: 0.7s; }
+
+    .step-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .step-text {
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      color: #c4b0a8;
+      text-align: left;
+      line-height: 1.6;
+    }
+    .step-text strong {
+      color: #f5ede8;
+      font-weight: 300;
+      display: block;
+      font-size: 0.78rem;
+    }
+
+    .btn-start {
+      margin-top: 2.5rem;
+      padding: 0.9rem 2.8rem;
+      background: transparent;
+      border: 1px solid #e8a89c;
+      color: #e8a89c;
+      font-family: 'Josefin Sans', sans-serif;
+      font-size: 0.72rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: color 0.3s ease;
+      opacity: 0;
+      animation: fadeUp 0.6s ease 1s forwards;
+    }
+    .btn-start::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: #e8a89c;
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+    }
+    .btn-start:hover { color: #1a0a10; }
+    .btn-start:hover::before { transform: translateX(0); }
+    .btn-start span { position: relative; z-index: 1; }
+
+    /* ── AR overlay UI ── */
+    #ar-ui {
+      position: fixed; inset: 0; z-index: 100;
+      pointer-events: none;
+      display: none;
+    }
+    #ar-ui.active { display: block; }
+
+    .ar-header {
+      position: absolute; top: 0; left: 0; right: 0;
+      padding: 2rem 1.5rem 1rem;
+      background: linear-gradient(to bottom, rgba(10,5,8,0.75), transparent);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    .ar-logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.3rem;
+      font-weight: 300;
+      color: #f5ede8;
+      letter-spacing: 0.1em;
+    }
+    .ar-logo em { color: #e8a89c; font-style: italic; }
+
+    .ar-hint {
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(245,237,232,0.6);
+      text-align: right;
+    }
+
+    .ar-footer {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 1rem 1.5rem 2.5rem;
+      background: linear-gradient(to top, rgba(10,5,8,0.7), transparent);
+      display: flex; align-items: center; justify-content: center; gap: 2rem;
+      pointer-events: all;
+    }
+
+    .ar-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      padding: 0.8rem 1.2rem;
+      cursor: pointer;
+      color: #f5ede8;
+      transition: all 0.2s ease;
+      border-radius: 2px;
+    }
+    .ar-btn:active { transform: scale(0.95); background: rgba(232,168,156,0.2); }
+    .ar-btn-icon { font-size: 1.4rem; }
+    .ar-btn-label {
+      font-size: 0.55rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(245,237,232,0.7);
+    }
+
+    /* Scanning frame corners */
+    .scan-frame {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -60%);
+      width: 200px; height: 200px;
+    }
+    .corner {
+      position: absolute;
+      width: 24px; height: 24px;
+      border-color: rgba(232,168,156,0.7);
+      border-style: solid;
+    }
+    .corner-tl { top: 0; left: 0; border-width: 2px 0 0 2px; }
+    .corner-tr { top: 0; right: 0; border-width: 2px 2px 0 0; }
+    .corner-bl { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
+    .corner-br { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+
+    .scan-label {
+      position: absolute;
+      bottom: -28px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.58rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: rgba(232,168,156,0.8);
+      white-space: nowrap;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    /* ── Animations ── */
+    @keyframes float {
+      0%, 100% { transform: translateY(0) rotate(-3deg); }
+      50% { transform: translateY(-12px) rotate(3deg); }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+
+    /* ── Petal rain (CSS only decoration on splash) ── */
+    .petals { position: fixed; inset: 0; pointer-events: none; z-index: 9998; overflow: hidden; }
+    .petal {
+      position: absolute;
+      top: -10%;
+      font-size: 1.1rem;
+      opacity: 0;
+      animation: fall linear infinite;
+    }
+    @keyframes fall {
+      0%   { opacity: 0; transform: translateY(0) rotate(0deg); }
+      10%  { opacity: 0.6; }
+      90%  { opacity: 0.4; }
+      100% { opacity: 0; transform: translateY(110vh) rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Petal rain decoration -->
+<div class="petals" id="petals"></div>
+
+<!-- Splash screen -->
+<div id="splash">
+  <div class="splash-deco">🌸</div>
+
+  <div class="splash-brand">
+    Flores en<br><span>Realidad Aumentada</span>
+  </div>
+  <div class="splash-sub">Experiencia inmersiva · WebAR</div>
+
+  <div class="divider"></div>
+
+  <div class="splash-instructions">
+    <div class="step">
+      <div class="step-icon">📷</div>
+      <div class="step-text">
+        <strong>Permite acceso a la cámara</strong>
+        cuando el navegador lo solicite
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-icon">🌍</div>
+      <div class="step-text">
+        <strong>Apunta al suelo o a una superficie</strong>
+        plana frente a ti
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-icon">✨</div>
+      <div class="step-text">
+        <strong>¡Mira los arreglos florecer!</strong>
+        mueve el teléfono para explorar
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-start" id="btnStart">
+    <span>Comenzar experiencia</span>
+  </button>
+</div>
+
+<!-- AR Overlay UI -->
+<div id="ar-ui">
+  <div class="ar-header">
+    <div class="ar-logo">Flores <em>AR</em></div>
+    <div class="ar-hint">Apunta al piso<br>para ver las flores</div>
+  </div>
+
+  <div class="scan-frame">
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+    <div class="scan-label">Buscar superficie</div>
+  </div>
+
+  <div class="ar-footer">
+    <div class="ar-btn" id="btnRotate">
+      <div class="ar-btn-icon">🔄</div>
+      <div class="ar-btn-label">Girar</div>
+    </div>
+    <div class="ar-btn" id="btnScale">
+      <div class="ar-btn-icon">🔍</div>
+      <div class="ar-btn-label">Tamaño</div>
+    </div>
+    <div class="ar-btn" id="btnReset">
+      <div class="ar-btn-icon">🏠</div>
+      <div class="ar-btn-label">Reiniciar</div>
+    </div>
+  </div>
+</div>
+
+<!-- A-Frame AR Scene (hidden until start) -->
+<div id="ar-scene-container" style="display:none; position:fixed; inset:0; z-index:50;">
+  <a-scene
+    embedded
+    arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+    renderer="logarithmicDepthBuffer: true; antialias: true;"
+    vr-mode-ui="enabled: false"
+    style="width:100%;height:100%;"
+  >
+
+    <!-- Assets: simple geometric flowers built with A-Frame primitives -->
+    <a-assets>
+      <!-- Flower colors -->
+    </a-assets>
+
+    <!-- Hiro marker - flowers appear on top of Hiro marker OR use location-based -->
+    <!-- We'll use a flat marker for easy testing. Also adding a fallback click-to-place -->
+    <a-marker preset="hiro" id="marker">
+      <a-entity id="floral-scene" position="0 0 0">
+
+        <!-- === CENTRO: Arreglo principal grande === -->
+        <!-- Tallo principal -->
+        <a-cylinder color="#4a7c59" height="0.6" radius="0.015" position="0 0.3 0"></a-cylinder>
+        <!-- Rosa grande roja - pétalos -->
+        <a-sphere color="#c0392b" radius="0.12" position="0 0.65 0" material="roughness:0.8"></a-sphere>
+        <a-sphere color="#e74c3c" radius="0.09" position="0.08 0.68 0.04" material="roughness:0.8"></a-sphere>
+        <a-sphere color="#e74c3c" radius="0.09" position="-0.08 0.68 0.04" material="roughness:0.8"></a-sphere>
+        <a-sphere color="#c0392b" radius="0.09" position="0 0.68 -0.08" material="roughness:0.8"></a-sphere>
+        <a-sphere color="#ff6b6b" radius="0.06" position="0 0.75 0" material="roughness:0.8"></a-sphere>
+        <!-- Hoja izq -->
+        <a-box color="#27ae60" width="0.12" height="0.04" depth="0.06" position="-0.1 0.35 0" rotation="0 0 30"></a-box>
+        <!-- Hoja der -->
+        <a-box color="#2ecc71" width="0.12" height="0.04" depth="0.06" position="0.1 0.4 0" rotation="0 0 -25"></a-box>
+
+        <!-- === IZQUIERDA FRENTE: Girasol === -->
+        <a-cylinder color="#5d4037" height="0.5" radius="0.012" position="-0.35 0.25 0.1"></a-cylinder>
+        <!-- Centro marrón -->
+        <a-sphere color="#6d4c41" radius="0.07" position="-0.35 0.52 0.1"></a-sphere>
+        <!-- Pétalos amarillos -->
+        <a-box color="#f39c12" width="0.14" height="0.04" depth="0.05" position="-0.35 0.52 0.1" rotation="0 0 0"></a-box>
+        <a-box color="#f39c12" width="0.14" height="0.04" depth="0.05" position="-0.35 0.52 0.1" rotation="0 0 45"></a-box>
+        <a-box color="#f39c12" width="0.14" height="0.04" depth="0.05" position="-0.35 0.52 0.1" rotation="0 0 90"></a-box>
+        <a-box color="#f39c12" width="0.14" height="0.04" depth="0.05" position="-0.35 0.52 0.1" rotation="0 0 135"></a-box>
+        <a-box color="#f1c40f" width="0.12" height="0.03" depth="0.05" position="-0.35 0.52 0.1" rotation="0 22 22"></a-box>
+        <a-box color="#f1c40f" width="0.12" height="0.03" depth="0.05" position="-0.35 0.52 0.1" rotation="0 22 67"></a-box>
+        <a-box color="#f1c40f" width="0.12" height="0.03" depth="0.05" position="-0.35 0.52 0.1" rotation="0 22 112"></a-box>
+        <a-box color="#f1c40f" width="0.12" height="0.03" depth="0.05" position="-0.35 0.52 0.1" rotation="0 22 157"></a-box>
+
+        <!-- === DERECHA FRENTE: Tulipán morado === -->
+        <a-cylinder color="#4a7c59" height="0.45" radius="0.012" position="0.35 0.225 0.1"></a-cylinder>
+        <a-sphere color="#8e44ad" radius="0.08" position="0.35 0.5 0.1" material="roughness:0.7" scale="1 1.4 1"></a-sphere>
+        <a-sphere color="#9b59b6" radius="0.07" position="0.38 0.52 0.12" material="roughness:0.7" scale="0.8 1.3 0.8"></a-sphere>
+        <a-sphere color="#9b59b6" radius="0.07" position="0.32 0.52 0.12" material="roughness:0.7" scale="0.8 1.3 0.8"></a-sphere>
+        <a-sphere color="#d2b4de" radius="0.05" position="0.35 0.57 0.1"></a-sphere>
+
+        <!-- === ATRÁS IZQUIERDA: Flor tropical naranja === -->
+        <a-cylinder color="#4a7c59" height="0.55" radius="0.013" position="-0.2 0.275 -0.25" rotation="0 0 8"></a-cylinder>
+        <a-sphere color="#e67e22" radius="0.07" position="-0.2 0.59 -0.25"></a-sphere>
+        <a-box color="#e74c3c" width="0.15" height="0.04" depth="0.04" position="-0.2 0.59 -0.25" rotation="0 0 0"></a-box>
+        <a-box color="#e67e22" width="0.15" height="0.04" depth="0.04" position="-0.2 0.59 -0.25" rotation="0 0 60"></a-box>
+        <a-box color="#f39c12" width="0.15" height="0.04" depth="0.04" position="-0.2 0.59 -0.25" rotation="0 0 120"></a-box>
+        <a-sphere color="#ff6348" radius="0.04" position="-0.2 0.64 -0.25"></a-sphere>
+
+        <!-- === ATRÁS DERECHA: Lavanda / flor silvestre === -->
+        <a-cylinder color="#4a7c59" height="0.5" radius="0.01" position="0.2 0.25 -0.25"></a-cylinder>
+        <a-sphere color="#d7bde2" radius="0.04" position="0.2 0.54 -0.25"></a-sphere>
+        <a-sphere color="#c39bd3" radius="0.03" position="0.22 0.51 -0.24"></a-sphere>
+        <a-sphere color="#bb8fce" radius="0.03" position="0.18 0.51 -0.24"></a-sphere>
+        <a-sphere color="#c39bd3" radius="0.03" position="0.2 0.48 -0.23"></a-sphere>
+        <a-sphere color="#d7bde2" radius="0.025" position="0.21 0.46 -0.25"></a-sphere>
+        <a-sphere color="#d2b4de" radius="0.025" position="0.19 0.45 -0.26"></a-sphere>
+        <!-- hojas finas -->
+        <a-box color="#1e8449" width="0.08" height="0.02" depth="0.03" position="0.17 0.3 -0.25" rotation="0 0 20"></a-box>
+
+        <!-- === PEQUEÑAS FLORES DISPERSAS: margaritas blancas === -->
+        <!-- Margarita 1 -->
+        <a-cylinder color="#4a7c59" height="0.3" radius="0.008" position="-0.45 0.15 -0.05"></a-cylinder>
+        <a-sphere color="#f9e4b7" radius="0.04" position="-0.45 0.32 -0.05"></a-sphere>
+        <a-box color="#fdfefe" width="0.1" height="0.02" depth="0.03" position="-0.45 0.32 -0.05" rotation="0 0 0"></a-box>
+        <a-box color="#fdfefe" width="0.1" height="0.02" depth="0.03" position="-0.45 0.32 -0.05" rotation="0 0 60"></a-box>
+        <a-box color="#fdfefe" width="0.1" height="0.02" depth="0.03" position="-0.45 0.32 -0.05" rotation="0 0 120"></a-box>
+
+        <!-- Margarita 2 -->
+        <a-cylinder color="#4a7c59" height="0.28" radius="0.008" position="0.42 0.14 -0.1"></a-cylinder>
+        <a-sphere color="#f9e4b7" radius="0.04" position="0.42 0.30 -0.1"></a-sphere>
+        <a-box color="#fef9e7" width="0.09" height="0.02" depth="0.03" position="0.42 0.30 -0.1" rotation="0 0 0"></a-box>
+        <a-box color="#fef9e7" width="0.09" height="0.02" depth="0.03" position="0.42 0.30 -0.1" rotation="0 0 60"></a-box>
+        <a-box color="#fef9e7" width="0.09" height="0.02" depth="0.03" position="0.42 0.30 -0.1" rotation="0 0 120"></a-box>
+
+        <!-- === BASE: maceta / wrap floral === -->
+        <a-cylinder color="#8d6e63" height="0.15" radius="0.22" position="0 0.075 0" material="roughness:0.9"></a-cylinder>
+        <a-cylinder color="#795548" height="0.04" radius="0.24" position="0 0.15 0"></a-cylinder>
+        <!-- musgo / tierra decorativa -->
+        <a-sphere color="#2e7d32" radius="0.2" position="0 0.14 0" scale="1 0.3 1"></a-sphere>
+
+        <!-- Animación de flotación suave en toda la escena -->
+        <a-animation attribute="rotation" to="0 360 0" dur="20000" repeat="indefinite" easing="linear"></a-animation>
+      </a-entity>
+    </a-marker>
+
+    <a-entity camera></a-entity>
+  </a-scene>
+</div>
+
+<script>
+  /* ── Petal rain generator ── */
+  const petalEmojis = ['🌸','🌺','🌹','🌷','✿','❀','🌼'];
+  const petalsContainer = document.getElementById('petals');
+  for (let i = 0; i < 18; i++) {
+    const p = document.createElement('div');
+    p.className = 'petal';
+    p.textContent = petalEmojis[Math.floor(Math.random() * petalEmojis.length)];
+    p.style.left = Math.random() * 100 + '%';
+    p.style.fontSize = (0.8 + Math.random() * 1.2) + 'rem';
+    p.style.animationDuration = (6 + Math.random() * 10) + 's';
+    p.style.animationDelay = (Math.random() * 8) + 's';
+    petalsContainer.appendChild(p);
+  }
+
+  /* ── Start button ── */
+  document.getElementById('btnStart').addEventListener('click', () => {
+    const splash = document.getElementById('splash');
+    splash.classList.add('hidden');
+
+    setTimeout(() => {
+      document.getElementById('ar-scene-container').style.display = 'block';
+      const arUI = document.getElementById('ar-ui');
+      arUI.classList.add('active');
+      petalsContainer.style.display = 'none';
+    }, 700);
+  });
+
+  /* ── AR Control buttons ── */
+  let rotation = 0;
+  let scale = 1;
+  const scaleSteps = [0.5, 0.75, 1, 1.5, 2];
+  let scaleIdx = 2;
+
+  document.getElementById('btnRotate').addEventListener('click', () => {
+    rotation = (rotation + 45) % 360;
+    const scene = document.getElementById('floral-scene');
+    if (scene) scene.setAttribute('rotation', `0 ${rotation} 0`);
+  });
+
+  document.getElementById('btnScale').addEventListener('click', () => {
+    scaleIdx = (scaleIdx + 1) % scaleSteps.length;
+    scale = scaleSteps[scaleIdx];
+    const scene = document.getElementById('floral-scene');
+    if (scene) scene.setAttribute('scale', `${scale} ${scale} ${scale}`);
+  });
+
+  document.getElementById('btnReset').addEventListener('click', () => {
+    rotation = 0; scaleIdx = 2; scale = 1;
+    const scene = document.getElementById('floral-scene');
+    if (scene) {
+      scene.setAttribute('rotation', '0 0 0');
+      scene.setAttribute('scale', '1 1 1');
+    }
+  });
+
+  /* ── Hide scan frame once marker found ── */
+  document.addEventListener('DOMContentLoaded', () => {
+    const marker = document.getElementById('marker');
+    const scanFrame = document.querySelector('.scan-frame');
+    if (marker) {
+      marker.addEventListener('markerFound', () => {
+        if (scanFrame) scanFrame.style.opacity = '0';
+      });
+      marker.addEventListener('markerLost', () => {
+        if (scanFrame) scanFrame.style.opacity = '1';
+      });
+    }
+  });
+</script>
+</body>
+</html>
